@@ -1,0 +1,10 @@
+{
+  "name": "Remix ChatterBots",
+  "description": "Build and banter with your own AI characters using the Live API.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
