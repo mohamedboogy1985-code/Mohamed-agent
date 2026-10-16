@@ -10,6 +10,7 @@ import { AudioStreamer } from '../../lib/audio-streamer';
 import { audioContext } from '../../lib/utils';
 import VolMeterWorket from '../../lib/worklets/vol-meter';
 import { DEFAULT_LIVE_API_MODEL } from '../../lib/constants';
+import { isValidApiKey, useApiKey } from '../../lib/api-key';
 
 export type UseLiveApiResults = {
   client: GenAILiveClient;
@@ -34,6 +35,13 @@ export function useLiveApi({
   const client = useMemo(() => new GenAILiveClient(apiKey, model), [apiKey, model]);
 
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
+
+  // إغلاق أي جلسة قديمة عند تغيير عميل الاتصال (مثلاً بعد تغيير مفتاح API)
+  useEffect(() => {
+    return () => {
+      client.disconnect();
+    };
+  }, [client]);
 
   const [volume, setVolume] = useState(0);
   const [connected, setConnected] = useState(false);
@@ -108,9 +116,17 @@ export function useLiveApi({
     if (!config) {
       throw new Error('config has not been set');
     }
+
+    // لا تحاول الاتصال بدون مفتاح صالح — اعرض نافذة إدخال المفتاح بدلاً من ذلك
+    if (!isValidApiKey(apiKey)) {
+      const ui = useApiKey.getState();
+      ui.openApiKeyModal();
+      return;
+    }
+
     client.disconnect();
     await client.connect(config);
-  }, [client, config]);
+  }, [client, config, apiKey]);
 
   const disconnect = useCallback(async () => {
     client.disconnect();
