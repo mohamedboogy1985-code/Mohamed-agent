@@ -69,7 +69,10 @@ export const INITIAL_ACCOUNTS: Account[] = [
   { id: '201', code: '2010', name: 'موردو الخدمات والمستلزمات النقابية', nameEn: 'Suppliers & Vendors Payable', type: 'liability', balance: 68000, currency: 'EGP' },
   { id: '202', code: '2020', name: 'مصلحة الضرائب المصرية (دمغات وكسب عمل)', nameEn: 'Egyptian Tax Authority & Stamp Dues', type: 'liability', balance: 32000, currency: 'EGP' },
   { id: '203', code: '2030', name: 'أمانات صندوق المعاشات والرعاية التكميلية', nameEn: 'Pensions & Member Care Trust', type: 'liability', balance: 145000, currency: 'EGP' },
-  { id: '301', code: '3010', name: 'صندوق النقابة العام والاحتياطي', nameEn: 'General Syndicate Reserve Fund', type: 'equity', balance: 950000, currency: 'EGP' },
+  // ملاحظة محاسبية: حقوق الملكية لا تتضمن صافي فائض الفترة الحالية غير المُقفل
+  // (الفائض 240,000 ج.م ما زال مفتوحاً في الإيرادات والمصروفات)، وبذلك يتحقق
+  // توازن ميزان المراجعة: الأصول + المصروفات = الالتزامات + حقوق الملكية + الإيرادات
+  { id: '301', code: '3010', name: 'صندوق النقابة العام والاحتياطي', nameEn: 'General Syndicate Reserve Fund', type: 'equity', balance: 710000, currency: 'EGP' },
   { id: '302', code: '3020', name: 'الفائض المالي المرحل', nameEn: 'Retained Surplus', type: 'equity', balance: 190000, currency: 'EGP' },
   { id: '401', code: '4010', name: 'إيرادات اشتراكات وتجديد العضوية', nameEn: 'Membership Dues & Renewal', type: 'revenue', balance: 380000, currency: 'EGP' },
   { id: '402', code: '4020', name: 'إيرادات الدمغات ورخص مشاريع التشييد', nameEn: 'Construction Licenses & Stamp Fees', type: 'revenue', balance: 290000, currency: 'EGP' },
@@ -158,6 +161,7 @@ class AccountingDatabase extends EventEmitter {
   private async init(): Promise<void> {
     if (typeof window === 'undefined' || !window.indexedDB) {
       this.loadFromLocalStorage();
+      await this.reconcileLegacySeedData();
       return;
     }
 
@@ -231,6 +235,41 @@ class AccountingDatabase extends EventEmitter {
         INITIAL_PARTIES.forEach((p) => parStore.put(p));
       }
     };
+  }
+
+  /**
+   * إصلاح بيانات بذرة قديمة حُفظت قبل تصحيح حقوق الملكية.
+   * كانت حقوق الملكية تتضمن صافي فائض الفترة غير المُقفل، ما كان يُظهر
+   * فارقاً محاسبياً وهمياً قدره 240,000 ج.م في ميزان المراجعة.
+   */
+  private async reconcileLegacySeedData(): Promise<void> {
+    try {
+      const accounts = await this.getAccounts();
+      const reserve = accounts.find((a) => a.code === '3010');
+      const surplus = accounts.find((a) => a.code === '3020');
+      if (!reserve || !surplus) return;
+      if (reserve.balance !== 950000 || surplus.balance !== 190000) return;
+
+      const fixed = accounts.map((a) => (a.code === '3010' ? { ...a, balance: 710000 } : a));
+      this.memoryAccounts = fixed;
+      this.invalidateCache();
+
+      if (this.db) {
+        await new Promise<void>((resolve) => {
+          const tx = this.db!.transaction('accounts', 'readwrite');
+          const store = tx.objectStore('accounts');
+          fixed.forEach((a) => store.put(a));
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+          tx.onabort = () => resolve();
+        });
+      } else {
+        this.saveToLocalStorage();
+      }
+      console.info('تم تصحيح بيانات حقوق الملكية القديمة لتوازن ميزان المراجعة.');
+    } catch (e) {
+      console.warn('تعذر تنفيذ تصحيح البيانات القديمة:', e);
+    }
   }
 
   public async getAccounts(): Promise<Account[]> {

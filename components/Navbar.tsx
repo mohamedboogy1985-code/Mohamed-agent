@@ -6,6 +6,7 @@
 import React from 'react';
 import { useLiveAPIContext } from '@/contexts/LiveAPIContext';
 import { useAgent, useUI, useUser, ActiveTab } from '@/lib/state';
+import { isValidApiKey, useApiKey } from '@/lib/api-key';
 import {
   Mic,
   MicOff,
@@ -21,6 +22,8 @@ import {
   UserCheck,
   Building2,
   HardDriveDownload,
+  KeyRound,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -34,6 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onSync, pendingSyncCount, isOnli
   const { current, availablePresets, setCurrent } = useAgent();
   const { activeTab, setActiveTab } = useUI();
   const { companyName } = useUser();
+  const { apiKey, openApiKeyModal } = useApiKey();
+  const keyReady = isValidApiKey(apiKey);
 
   const getStatusBadge = () => {
     switch (status) {
@@ -180,6 +185,26 @@ export const Navbar: React.FC<NavbarProps> = ({ onSync, pendingSyncCount, isOnli
                 {isOnline ? 'Online' : 'Offline'}
               </span>
             </div>
+
+            {/* API Key Status */}
+            <button
+              onClick={openApiKeyModal}
+              title={
+                keyReady
+                  ? 'مفتاح Gemini API مُهيّأ — اضغط لتغييره'
+                  : 'لم يتم إدخال مفتاح Gemini API — اضغط لإدخاله'
+              }
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                keyReady
+                  ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50 hover:bg-emerald-900/40'
+                  : 'bg-amber-950/50 text-amber-300 border-amber-700/60 hover:bg-amber-900/50 animate-pulse'
+              }`}
+            >
+              {keyReady ? <KeyRound className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline text-[11px] font-semibold">
+                {keyReady ? 'المفتاح جاهز' : 'أدخل المفتاح'}
+              </span>
+            </button>
 
             {/* Status Badge */}
             {getStatusBadge()}

@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Environment / secrets (لا تُرفع مفاتيح API إلى المستودع)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
